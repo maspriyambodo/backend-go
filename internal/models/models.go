@@ -141,3 +141,43 @@ type MenuNavigation struct {
 	Icon     string `json:"icon" db:"icon"`
 	Children string `json:"children" db:"children"`
 }
+
+// UserMenu represents the user_menu table
+type UserMenu struct {
+	UserID    uint64     `json:"user_id" db:"user_id"`
+	MenuID    uint       `json:"menu_id" db:"menu_id"`
+	DeletedAt *time.Time `json:"deleted_at" db:"deleted_at"`
+	DeletedBy *uint64    `json:"deleted_by" db:"deleted_by"`
+}
+
+// CreateUserMenuRequest for creating a new user-menu assignment
+type CreateUserMenuRequest struct {
+	UserID uint64 `json:"user_id" binding:"required"`
+	MenuID uint   `json:"menu_id" binding:"required"`
+}
+
+// UpdateUserMenuRequest for updating an existing user-menu assignment
+type UpdateUserMenuRequest struct {
+	UserID *uint64 `json:"user_id,omitempty"`
+	MenuID *uint   `json:"menu_id,omitempty"`
+}
+
+// UserRole represents the user_roles table
+type UserRole struct {
+	UserID    uint64     `json:"user_id" db:"user_id"`
+	RoleID    uint       `json:"role_id" db:"role_id"`
+	DeletedAt *time.Time `json:"deleted_at" db:"deleted_at"`
+	DeletedBy *uint64    `json:"deleted_by" db:"deleted_by"`
+}
+
+// CreateUserRoleRequest for creating a new user-role assignment
+type CreateUserRoleRequest struct {
+	UserID uint64 `json:"user_id" binding:"required"`
+	RoleID uint   `json:"role_id" binding:"required"`
+}
+
+// UpdateUserRoleRequest for updating an existing user-role assignment
+type UpdateUserRoleRequest struct {
+	UserID *uint64 `json:"user_id,omitempty"`
+	RoleID *uint   `json:"role_id,omitempty"`
+}

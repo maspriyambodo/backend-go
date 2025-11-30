@@ -83,6 +83,26 @@ func SetupRoutes(r *gin.Engine, db *sql.DB) {
 		menuNavigationGroup.GET("", listMenuNavigationHandler(db))
 	}
 
+	// User Menu CRUD
+	userMenuGroup := r.Group("/api/user_menu")
+	{
+		userMenuGroup.GET("", listUserMenusHandler(db))
+		userMenuGroup.GET("/:userId/:menuId", getUserMenuHandler(db))
+		userMenuGroup.POST("", createUserMenuHandler(db))
+		userMenuGroup.PUT("/:userId/:menuId", updateUserMenuHandler(db))
+		userMenuGroup.DELETE("/:userId/:menuId", deleteUserMenuHandler(db))
+	}
+
+	// User Roles CRUD
+	userRolesGroup := r.Group("/api/user_roles")
+	{
+		userRolesGroup.GET("", listUserRolesHandler(db))
+		userRolesGroup.GET("/:userId/:roleId", getUserRoleHandler(db))
+		userRolesGroup.POST("", createUserRoleHandler(db))
+		userRolesGroup.PUT("/:userId/:roleId", updateUserRoleHandler(db))
+		userRolesGroup.DELETE("/:userId/:roleId", deleteUserRoleHandler(db))
+	}
+
 }
 
 func pingHandler(c *gin.Context) {
