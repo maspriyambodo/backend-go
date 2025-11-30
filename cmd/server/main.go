@@ -4,8 +4,8 @@ import (
 	"log"
 	"os"
 
-	"adminbe/internal/database"
-	"adminbe/internal/handlers"
+	"adminbe/internal/app/handlers"
+	"adminbe/internal/pkg/database"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"

@@ -1,0 +1,29 @@
+# Application configuration
+server:
+  port: 8080
+  mode: release  # debug, release, test
+
+database:
+  host: localhost
+  port: 3306
+  username: root
+  password: ""
+  database: adminbe
+  charset: utf8mb4
+  parseTime: True
+  loc: Local
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+
+jwt:
+  secret: "change_this_in_production"
+  expiration: 24h
+
+cors:
+  allow_origins: ["*"]
+  allow_methods: ["GET", "POST", "PUT", "DELETE"]
+  allow_headers: ["Authorization", "Content-Type"]

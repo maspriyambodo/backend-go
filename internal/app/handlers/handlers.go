@@ -1,8 +1,8 @@
 package handlers
 
 import (
-	"adminbe/internal/database"
-	"adminbe/internal/middleware"
+	"adminbe/internal/app/middleware"
+	"adminbe/internal/pkg/database"
 	"log"
 
 	"github.com/gin-gonic/gin"

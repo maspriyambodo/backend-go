@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"adminbe/internal/models"
+	"adminbe/internal/app/models"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"

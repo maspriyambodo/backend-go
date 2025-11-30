@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"adminbe/internal/models"
+	"adminbe/internal/app/models"
 
 	"github.com/gin-gonic/gin"
 )

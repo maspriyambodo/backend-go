@@ -1,10 +1,11 @@
 package handlers
 
 import (
-	"adminbe/internal/models"
+	"adminbe/internal/app/models"
+	"adminbe/internal/pkg/utils"
+	"context"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 	"time"
 
@@ -29,8 +30,11 @@ func loginHandler(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
+		defer cancel()
+
 		var user models.User
-		result := db.Where("email = ? AND deleted_at IS NULL", req.Email).First(&user)
+		result := db.WithContext(ctx).Where("email = ? AND deleted_at IS NULL", req.Email).First(&user)
 		if result.Error != nil {
 			if result.Error == gorm.ErrRecordNotFound {
 				log.Printf("Login failed: user not found for email %s", req.Email)
@@ -57,10 +61,7 @@ func loginHandler(db *gorm.DB) gin.HandlerFunc {
 		}
 
 		// Generate JWT
-		jwtSecret := os.Getenv("JWT_SECRET")
-		if jwtSecret == "" {
-			jwtSecret = "default_secret_change_in_prod"
-		}
+		jwtSecret := utils.GetJWTSecret()
 
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 			"user_id":  strconv.FormatUint(user.ID, 10),

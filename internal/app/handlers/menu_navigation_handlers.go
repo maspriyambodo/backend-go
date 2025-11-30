@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"adminbe/internal/database"
-	"adminbe/internal/models"
+	"adminbe/internal/app/models"
+	"adminbe/internal/pkg/database"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
