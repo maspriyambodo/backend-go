@@ -181,12 +181,20 @@ func deleteRoleHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Get current user ID
+		userIDVal, exists := c.Get("user_id")
+		var userID *uint64
+		if exists {
+			uid := userIDVal.(uint64)
+			userID = &uid
+		}
+
 		// Get old values before delete
 		var oldRole struct {
 			Name        string  `json:"name"`
 			Description *string `json:"description"`
 		}
-		err = db.QueryRow("SELECT name, description FROM roles WHERE id = ? AND deleted_at IS NULL", uint(roleID)).Scan(&oldRole.Name, &oldRole.Description)
+		err = db.QueryRow("SELECT name, description FROM roles WHERE id = ?", uint(roleID)).Scan(&oldRole.Name, &oldRole.Description)
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
 			return
@@ -196,7 +204,7 @@ func deleteRoleHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		_, err = db.Exec("UPDATE roles SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL", time.Now(), time.Now(), uint(roleID))
+		_, err = db.Exec("UPDATE roles SET deleted_at = ?, updated_at = ?, deleted_by = ? WHERE id = ? AND deleted_at IS NULL", time.Now(), time.Now(), userID, uint(roleID))
 		if err != nil {
 			log.Printf("Error soft deleting role: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Soft delete failed"})
@@ -204,6 +212,6 @@ func deleteRoleHandler(db *sql.DB) gin.HandlerFunc {
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "Role deleted"})
-		createAuditLog(db, nil, "DELETE", "roles", uint64(roleID), oldRole, nil)
+		createAuditLog(db, userID, "DELETE", "roles", uint64(roleID), oldRole, nil)
 	}
 }

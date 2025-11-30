@@ -1,15 +1,19 @@
 package database
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"os"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-redis/redis/v8"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-func ConnectDB() *sql.DB {
+var RedisClient *redis.Client
+
+func ConnectDB() *gorm.DB {
 	user := os.Getenv("DB_USER")
 	if user == "" {
 		user = "root"
@@ -28,15 +32,43 @@ func ConnectDB() *sql.DB {
 		name = "db_cms"
 	}
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true", user, pass, host, port, name)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local", user, pass, host, port, name)
 
-	db, err := sql.Open("mysql", dsn)
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to connect to database: %v", err)
 	}
-	if err := db.Ping(); err != nil {
-		log.Fatal(err)
+
+	// Test the connection
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal("Failed to get underlying SQL DB:", err)
 	}
-	log.Println("Connected to MySQL database")
+	if err := sqlDB.Ping(); err != nil {
+		log.Fatal("Failed to ping database:", err)
+	}
+	log.Println("Connected to MySQL database with GORM")
+
+	// Connect Redis
+	redisAddr := os.Getenv("REDIS_ADDR")
+	if redisAddr == "" {
+		redisAddr = "127.0.0.1:6379"
+	}
+	redisPass := os.Getenv("REDIS_PASS")
+
+	RedisClient = redis.NewClient(&redis.Options{
+		Addr:     redisAddr,
+		Password: redisPass,
+		DB:       0,
+	})
+
+	if err := RedisClient.Ping(RedisClient.Context()).Err(); err != nil {
+		log.Printf("Failed to connect to Redis: %v", err)
+	} else {
+		log.Println("Connected to Redis")
+	}
+
 	return db
 }

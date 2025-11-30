@@ -24,7 +24,10 @@ func main() {
 	r.Use(cors.Default())
 
 	db := database.ConnectDB()
-	defer db.Close()
+	defer func() {
+		sqlDB, _ := db.DB()
+		sqlDB.Close()
+	}()
 
 	handlers.SetupRoutes(r, db)
 
