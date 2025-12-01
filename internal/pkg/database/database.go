@@ -11,7 +11,10 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-var RedisClient *redis.Client
+var (
+	RedisClient *redis.Client
+	StmtCache   *PreparedStmts
+)
 
 func ConnectDB() *gorm.DB {
 	user := os.Getenv("DB_USER")
@@ -69,6 +72,10 @@ func ConnectDB() *gorm.DB {
 	} else {
 		log.Println("Connected to Redis")
 	}
+
+	// Initialize prepared statements cache
+	StmtCache = NewPreparedStmts(sqlDB)
+	log.Println("Initialized prepared statements cache")
 
 	return db
 }

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"adminbe/internal/app/models"
@@ -163,7 +164,7 @@ func updateUserRoleHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		query := "UPDATE user_roles SET " + join(setParts, ", ") + " WHERE user_id = ? AND role_id = ? AND deleted_at IS NULL"
+		query := "UPDATE user_roles SET " + strings.Join(setParts, ", ") + " WHERE user_id = ? AND role_id = ? AND deleted_at IS NULL"
 		args = append(args, userID, uint(roleID))
 
 		_, err = db.Exec(query, args...)

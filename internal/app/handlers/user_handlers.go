@@ -10,10 +10,14 @@ import (
 	"time"
 
 	"adminbe/internal/app/models"
+	"adminbe/internal/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
+
+// Pre-allocated user slice to avoid repeated allocations
+var usersPool = make([]models.User, 0, 50) // Initial capacity of 50
 
 // listUsersHandler GET /api/users
 func listUsersHandler(db *sql.DB) gin.HandlerFunc {
@@ -21,23 +25,35 @@ func listUsersHandler(db *sql.DB) gin.HandlerFunc {
 		rows, err := db.Query("SELECT id, username, email, status, created_at, updated_at, deleted_at, deleted_by FROM users WHERE deleted_at IS NULL")
 		if err != nil {
 			log.Printf("Error querying users: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
+			response := utils.GetResponseObject()
+			response["error"] = "Failed to retrieve users"
+			c.JSON(http.StatusInternalServerError, response)
+			utils.PutResponseObject(response)
 			return
 		}
 		defer rows.Close()
 
-		var users []models.User
+		// Reset slice to zero length but keep capacity
+		users := utils.ResetSliceToZeroLen(usersPool)
+
 		for rows.Next() {
 			var u models.User
 			if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.Status, &u.CreatedAt, &u.UpdatedAt, &u.DeletedAt, &u.DeletedBy); err != nil {
 				log.Printf("Error scanning user row: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
+				response := utils.GetResponseObject()
+				response["error"] = "Failed to retrieve users"
+				c.JSON(http.StatusInternalServerError, response)
+				utils.PutResponseObject(response)
 				return
 			}
 			u.PasswordHash = "" // not needed
 			users = append(users, u)
 		}
-		c.JSON(http.StatusOK, gin.H{"data": users})
+
+		response := utils.GetResponseObject()
+		response["data"] = users
+		c.JSON(http.StatusOK, response)
+		utils.PutResponseObject(response)
 	}
 }
 
@@ -166,7 +182,7 @@ func updateUserHandler(db *sql.DB) gin.HandlerFunc {
 		setParts = append(setParts, "updated_at = ?")
 		args = append(args, time.Now())
 
-		query := "UPDATE users SET " + join(setParts, ", ") + " WHERE id = ? AND deleted_at IS NULL"
+		query := buildUpdateQuery(setParts, "users")
 		args = append(args, userID)
 
 		_, err = db.Exec(query, args...)
@@ -200,16 +216,10 @@ func deleteUserHandler(db *sql.DB) gin.HandlerFunc {
 	}
 }
 
-// Helper
-func join(strings []string, sep string) string {
-	if len(strings) == 0 {
-		return ""
-	}
-	result := strings[0]
-	for _, s := range strings[1:] {
-		result += sep + s
-	}
-	return result
+// Optimized UPDATE query building
+func buildUpdateQuery(setParts []string, table string) string {
+	setClause := utils.JoinStrings(setParts, ", ")
+	return "UPDATE " + table + " SET " + setClause + " WHERE id = ? AND deleted_at IS NULL"
 }
 
 // createAuditLog logs audit events

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"adminbe/internal/app/models"
+	utils "adminbe/internal/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -144,7 +145,7 @@ func updateRoleInheritanceHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		query := "UPDATE role_inheritances SET " + join(setParts, ", ") + " WHERE id = ?"
+		query := "UPDATE role_inheritances SET " + utils.JoinStrings(setParts, ", ") + " WHERE id = ?"
 		args = append(args, inheritanceID)
 
 		_, err = db.Exec(query, args...)

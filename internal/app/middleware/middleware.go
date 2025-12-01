@@ -15,6 +15,7 @@ import (
 )
 
 // RequestLoggerMiddleware logs incoming requests to console and audit logs
+// Optimized to avoid goroutine leaks by making audit logging synchronous with timeout
 func RequestLoggerMiddleware(db *sql.DB) gin.HandlerFunc {
 	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 		logStr := fmt.Sprintf("%s - [%s] %s %s %s %d %s %s\n",
@@ -31,8 +32,8 @@ func RequestLoggerMiddleware(db *sql.DB) gin.HandlerFunc {
 		// Log to console
 		log.Print(logStr)
 
-		// Create audit log for API request
-		go logRequestToAudit(db, param)
+		// Create audit log for API request (synchronous to prevent leaks, with timeout)
+		logRequestToAudit(db, param)
 
 		return logStr
 	})

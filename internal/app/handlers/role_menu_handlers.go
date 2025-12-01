@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"adminbe/internal/app/models"
@@ -163,7 +164,7 @@ func updateRoleMenuHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		query := "UPDATE role_menu SET " + join(setParts, ", ") + " WHERE role_id = ? AND menu_id = ? AND deleted_at IS NULL"
+		query := "UPDATE role_menu SET " + strings.Join(setParts, ", ") + " WHERE role_id = ? AND menu_id = ? AND deleted_at IS NULL"
 		args = append(args, uint(roleID), uint(menuID))
 
 		_, err = db.Exec(query, args...)

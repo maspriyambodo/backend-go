@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"adminbe/internal/app/models"
+	"adminbe/internal/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -185,7 +186,7 @@ func updateMenuHandler(db *sql.DB) gin.HandlerFunc {
 		setParts = append(setParts, "updated_at = ?")
 		args = append(args, time.Now())
 
-		query := "UPDATE menu SET " + join(setParts, ", ") + " WHERE id = ? AND deleted_at IS NULL"
+		query := "UPDATE menu SET " + utils.JoinStrings(setParts, ", ") + " WHERE id = ? AND deleted_at IS NULL"
 		args = append(args, menuID)
 
 		_, err = db.Exec(query, args...)

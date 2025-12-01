@@ -2,13 +2,21 @@ package utils
 
 import (
 	"os"
+	"sync"
 )
 
-// GetJWTSecret retrieves the JWT secret from environment or returns default
+var (
+	jwtSecret     string
+	jwtSecretOnce sync.Once
+)
+
+// GetJWTSecret retrieves the JWT secret from environment (cached after first call)
 func GetJWTSecret() string {
-	secret := os.Getenv("JWT_SECRET")
-	if secret == "" {
-		secret = "default_secret_change_in_prod"
-	}
-	return secret
+	jwtSecretOnce.Do(func() {
+		jwtSecret = os.Getenv("JWT_SECRET")
+		if jwtSecret == "" {
+			jwtSecret = "default_secret_change_in_prod"
+		}
+	})
+	return jwtSecret
 }

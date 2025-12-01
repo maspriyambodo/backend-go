@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"adminbe/internal/app/models"
+	utils "adminbe/internal/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -152,7 +153,7 @@ func updateRoleHandler(db *sql.DB) gin.HandlerFunc {
 		setParts = append(setParts, "updated_at = ?")
 		args = append(args, time.Now())
 
-		query := "UPDATE roles SET " + join(setParts, ", ") + " WHERE id = ? AND deleted_at IS NULL"
+		query := "UPDATE roles SET " + utils.JoinStrings(setParts, ", ") + " WHERE id = ? AND deleted_at IS NULL"
 		args = append(args, uint(roleID))
 
 		_, err = db.Exec(query, args...)

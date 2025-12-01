@@ -125,7 +125,7 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 }
 
 func pingHandler(c *gin.Context) {
-	c.JSON(200, gin.H{
+	c.JSON(200, map[string]string{
 		"message": "pong",
 	})
 }
