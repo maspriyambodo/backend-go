@@ -10,11 +10,13 @@ A robust backend administration API built with Go and Gin framework, providing c
 - 📱 Dynamic menu system with navigation hierarchy
 - 🔗 Permissions management (User-Role, Role-Menu associations)
 - 📊 Audit logging for all operations
+- 📈 **JasperReports integration** - Generate and download reports from JasperServer
 - 🏥 Health check endpoints
 - 🔄 CORS support
 - 📖 RESTful API design
 - 🗄️ MySQL database with GORM ORM
 - ⚡ Redis caching support
+- 🔧 JasperServer REST API client
 
 ## Prerequisites
 
@@ -22,6 +24,7 @@ A robust backend administration API built with Go and Gin framework, providing c
 - Docker and Docker Compose (recommended for running the application)
 - MySQL 5.7+ or MariaDB 10.0+ (if running services locally)
 - Redis 6.0+ (if running services locally)
+- JasperServer 7.0+ or JasperReports Server (optional, for reports functionality)
 - Git
 
 ## Installation
@@ -73,6 +76,12 @@ REDIS_DB=0
 # JWT Configuration
 JWT_SECRET=your_generated_secret_key_here
 JWT_EXPIRATION=24h
+
+# JasperServer Configuration
+JASPER_BASE_URL=http://localhost:8080/jasperserver
+JASPER_USERNAME=jasperadmin
+JASPER_PASSWORD=password
+JASPER_ORGANIZATION=
 
 # Server Mode (debug/release/test)
 GIN_MODE=release
@@ -295,6 +304,77 @@ All API endpoints require `Bearer <jwt_token>` in the Authorization header.
 - `POST /api/audit_logs` - Create audit log entry
 - `PUT /api/audit_logs/:id` - Update audit log
 - `DELETE /api/audit_logs/:id` - Delete audit log
+
+#### JasperReports Integration
+
+The API includes JasperServer REST API integration for generating and downloading reports. All report endpoints require JasperServer to be configured.
+
+- `GET /api/reports/health` - Check JasperServer connectivity and health
+- `GET /api/reports/server-info` - Get JasperServer server information
+- `POST /api/reports/run` - Execute and download reports from JasperServer
+
+##### Run Report
+Executes a JasperServer report and returns the result as a file download or JSON response.
+
+```http
+POST /api/reports/run
+Authorization: Bearer <jwt_token>
+Content-Type: application/json
+
+{
+  "report_path": "/reports/samples/AllAccounts",
+  "output_format": "pdf",
+  "parameters": {
+    "start_date": "2023-01-01",
+    "end_date": "2023-12-31"
+  }
+}
+```
+
+Supported output formats:
+- `pdf` - PDF document (returns file download)
+- `html` - HTML report (returns JSON response)
+- `excel` - Excel spreadsheet (returns file download)
+- `xlsx` - Excel 2007+ (returns file download)
+- `xls` - Excel 97-2003 (returns file download)
+- `pptx` - PowerPoint presentation (returns file download)
+- `docx` - Word document (returns file download)
+- `rtf` - Rich Text Format (returns file download)
+- `png` - PNG image (returns file download)
+
+##### JasperServer Health Check
+```http
+GET /api/reports/health
+Authorization: Bearer <jwt_token>
+```
+
+Response:
+```json
+{
+  "status": "ok",
+  "message": "JasperServer is healthy"
+}
+```
+
+##### JasperServer Info
+```http
+GET /api/reports/server-info
+Authorization: Bearer <jwt_token>
+```
+
+Response:
+```json
+{
+  "server_info": {
+    "version": "8.2.0",
+    "edition": "Community",
+    "licenseType": "Community"
+  },
+  "status": "success"
+}
+```
+
+**Note:** JasperServer must be running and accessible at the configured URL for report generation to work.
 
 ## Development
 
