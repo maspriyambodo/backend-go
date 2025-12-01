@@ -18,9 +18,10 @@ A robust backend administration API built with Go and Gin framework, providing c
 
 ## Prerequisites
 
-- Go 1.19 or higher
-- MySQL 5.7+ or MariaDB 10.0+
-- Redis 6.0+
+- Go 1.19 or higher (for local development)
+- Docker and Docker Compose (recommended for running the application)
+- MySQL 5.7+ or MariaDB 10.0+ (if running services locally)
+- Redis 6.0+ (if running services locally)
 - Git
 
 ## Installation
@@ -114,13 +115,72 @@ cors:
 
 ## Running the Application
 
-1. Build the application:
+### Option 1: Docker Compose (Recommended)
+
+#### Development Environment
+```bash
+# Start the development environment with Docker Compose
+docker-compose -f docker-compose.dev.yml up -d
+
+# View logs
+docker-compose -f docker-compose.dev.yml logs -f app
+
+# Stop the development environment
+docker-compose -f docker-compose.dev.yml down
+```
+
+The development environment includes:
+- Auto-rebuilding on code changes (via volume mounts)
+- Local MySQL and Redis instances
+- Pre-configured database schema and sample data
+- Debug logging enabled
+- Access at http://localhost:8080
+
+Default login credentials:
+- Username: `admin`
+- Password: `admin123`
+
+#### Production Environment
+```bash
+# 1. Copy and configure production environment
+cp .env.prod .env.production
+# Edit .env.production with your production values
+
+# 2. Build the production image
+docker build -t adminbe:latest .
+
+# 3. Start production environment
+docker-compose -f docker-compose.prod.yml --env-file .env.production up -d
+
+# 4. View logs
+docker-compose -f docker-compose.prod.yml logs -f app
+
+# 5. Stop production environment
+docker-compose -f docker-compose.prod.yml down
+```
+
+**⚠️ Production Security Notes:**
+- Change all default passwords and secrets in `.env.prod`
+- Generate a strong JWT secret (minimum 32 characters)
+- Configure proper firewall rules
+- Use HTTPS in production (consider reverse proxy like nginx)
+- Regularly update Docker images for security patches
+
+### Option 2: Local Development
+
+1. Ensure you have MySQL and Redis running locally
+
+2. Build the application:
 ```bash
 chmod +x scripts/build.sh
 ./scripts/build.sh
 ```
 
-2. Run the server:
+3. Configure your local environment:
+   - Set database connection strings in `.env` or environment variables
+   - Or modify `configs/config.yaml` with your local settings
+
+4. Run the server:
 ```bash
 ./bin/adminbe
 ```

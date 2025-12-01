@@ -26,6 +26,19 @@ go.work.sum
 
 # env file
 .env
+.env.local
+.env.production
+.env.staging
+.env.*
+
+# Docker
+docker-compose.override.yml
+docker-compose.*.yml
+
+# Build artifacts
+bin/
+*.exe
+*.exe~
 
 # Editor/IDE
 # .idea/
