@@ -121,6 +121,14 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 			userRolesGroup.PUT("/:userId/:roleId", updateUserRoleHandler(sqlDB))
 			userRolesGroup.DELETE("/:userId/:roleId", deleteUserRoleHandler(sqlDB))
 		}
+
+		// Reports group
+		reportsGroup := apiGroup.Group("/reports")
+		{
+			reportsGroup.POST("/run", runReportHandler)
+			reportsGroup.GET("/server-info", getServerInfoHandler)
+			reportsGroup.GET("/health", jasperHealthHandler)
+		}
 	}
 }
 

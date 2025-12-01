@@ -29,6 +29,12 @@ func main() {
 		sqlDB.Close()
 	}()
 
+	// Initialize JasperServer client
+	err = handlers.InitJasperClient("configs/config.yaml")
+	if err != nil {
+		log.Printf("Failed to initialize JasperServer client: %v", err)
+	}
+
 	handlers.SetupRoutes(r, db)
 
 	port := os.Getenv("PORT")
