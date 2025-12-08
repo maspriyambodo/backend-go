@@ -2,7 +2,11 @@ package handlers
 
 import (
 	"adminbe/internal/app/middleware"
+	"adminbe/internal/app/repositories"
+	"adminbe/internal/app/services"
 	"adminbe/internal/pkg/database"
+	"database/sql"
+	"encoding/json"
 	"log"
 
 	"github.com/gin-gonic/gin"
@@ -11,6 +15,10 @@ import (
 
 func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	sqlDB, _ := db.DB()
+
+	// Dependency injection setup
+	userRepo := repositories.NewUserRepository(sqlDB)
+	userService := services.NewUserService(userRepo)
 
 	// Global middleware
 	r.Use(middleware.CustomRecoveryMiddleware())
@@ -33,11 +41,11 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		// User CRUD
 		userGroup := apiGroup.Group("/users")
 		{
-			userGroup.GET("", listUsersHandler(sqlDB))
-			userGroup.GET("/:id", getUserHandler(sqlDB))
-			userGroup.POST("", createUserHandler(sqlDB))
-			userGroup.PUT("/:id", updateUserHandler(sqlDB))
-			userGroup.DELETE("/:id", deleteUserHandler(sqlDB))
+			userGroup.GET("", listUsersHandler(userService))
+			userGroup.GET("/:id", getUserHandler(userService))
+			userGroup.POST("", createUserHandler(userService, sqlDB))
+			userGroup.PUT("/:id", updateUserHandler(userService))
+			userGroup.DELETE("/:id", deleteUserHandler(userService))
 		}
 
 		// Audit Logs CRUD
@@ -161,4 +169,22 @@ func healthHandler(c *gin.Context, db *gorm.DB) {
 	}
 
 	c.JSON(200, gin.H{"status": "ok", "message": "Service is healthy", "redis": redisHealthy})
+}
+
+// createAuditLog creates an audit log entry
+func createAuditLog(db *sql.DB, userID *uint64, eventType string, tableName string, recordID uint64, oldValues interface{}, newValues interface{}) {
+	var oldJSON, newJSON []byte
+	if oldValues != nil {
+		oldJSON, _ = json.Marshal(oldValues)
+	}
+	if newValues != nil {
+		newJSON, _ = json.Marshal(newValues)
+	}
+
+	// Insert audit log
+	_, err := db.Exec("INSERT INTO audit_logs (user_id, event_type, table_name, record_id, old_values, new_values) VALUES (?, ?, ?, ?, ?, ?)",
+		userID, eventType, tableName, recordID, oldJSON, newJSON)
+	if err != nil {
+		log.Printf("Error creating audit log: %v", err)
+	}
 }
