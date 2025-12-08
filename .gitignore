@@ -43,3 +43,4 @@ bin/
 # Editor/IDE
 # .idea/
 # .vscode/
+tmp/
