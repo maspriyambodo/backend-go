@@ -15,7 +15,34 @@ import (
 // listAuditLogsHandler GET /api/audit_logs
 func listAuditLogsHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.Query("SELECT id, user_id, event_type, table_name, record_id, old_values, new_values, ip_address, user_agent, created_at FROM audit_logs ORDER BY created_at DESC")
+		// Parse pagination parameters
+		pageStr := c.DefaultQuery("page", "1")
+		limitStr := c.DefaultQuery("limit", "50")
+
+		page, err := strconv.Atoi(pageStr)
+		if err != nil || page < 1 {
+			page = 1
+		}
+
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil || limit < 1 || limit > 1000 {
+			limit = 50
+		}
+
+		offset := (page - 1) * limit
+
+		// Get total count for pagination info
+		var totalCount int
+		err = db.QueryRow("SELECT COUNT(*) FROM audit_logs").Scan(&totalCount)
+		if err != nil {
+			log.Printf("Error counting audit logs: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count audit logs"})
+			return
+		}
+
+		// Query with pagination
+		rows, err := db.Query("SELECT id, user_id, event_type, table_name, record_id, old_values, new_values, ip_address, user_agent, created_at FROM audit_logs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+			limit, offset)
 		if err != nil {
 			log.Printf("Error querying audit logs: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve audit logs"})
@@ -33,7 +60,24 @@ func listAuditLogsHandler(db *sql.DB) gin.HandlerFunc {
 			}
 			logs = append(logs, a)
 		}
-		c.JSON(http.StatusOK, gin.H{"data": logs})
+
+		// Calculate pagination info
+		totalPages := (totalCount + limit - 1) / limit
+		hasNext := page < totalPages
+		hasPrev := page > 1
+
+		response := gin.H{
+			"data": logs,
+			"pagination": gin.H{
+				"page":        page,
+				"limit":       limit,
+				"total":       totalCount,
+				"total_pages": totalPages,
+				"has_next":    hasNext,
+				"has_prev":    hasPrev,
+			},
+		}
+		c.JSON(http.StatusOK, response)
 	}
 }
 

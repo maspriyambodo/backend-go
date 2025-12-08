@@ -14,8 +14,9 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 )
 
-// RequestLoggerMiddleware logs incoming requests to console and audit logs
-// Optimized to avoid goroutine leaks by making audit logging synchronous with timeout
+// RequestLoggerMiddleware logs incoming requests to console
+// Removed per-request audit logging to prevent memory allocation from JSON marshaling
+// Audit logs should be created selectively in handlers for important actions only
 func RequestLoggerMiddleware(db *sql.DB) gin.HandlerFunc {
 	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 		logStr := fmt.Sprintf("%s - [%s] %s %s %s %d %s %s\n",
@@ -29,11 +30,8 @@ func RequestLoggerMiddleware(db *sql.DB) gin.HandlerFunc {
 			param.Request.UserAgent(),
 		)
 
-		// Log to console
+		// Log to console only - removed audit logging for every request
 		log.Print(logStr)
-
-		// Create audit log for API request (synchronous to prevent leaks, with timeout)
-		logRequestToAudit(db, param)
 
 		return logStr
 	})

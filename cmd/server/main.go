@@ -35,6 +35,10 @@ func main() {
 		log.Printf("Failed to initialize JasperServer client: %v", err)
 	}
 
+	// Start async audit logging system
+	handlers.StartAuditLogger()
+	defer handlers.StopAuditLogger()
+
 	handlers.SetupRoutes(r, db)
 
 	port := os.Getenv("PORT")
