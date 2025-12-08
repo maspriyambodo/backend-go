@@ -7,8 +7,8 @@ import (
 
 	"adminbe/internal/app/models"
 	"adminbe/internal/app/repositories"
+	"adminbe/internal/pkg/utils"
 
-	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -69,10 +69,7 @@ func (s *userService) GetUser(id string) (*models.User, error) {
 
 	user, err := s.repo.GetByID(userID)
 	if err == sql.ErrNoRows {
-		return nil, gin.Error{
-			Err:  fmt.Errorf("user not found"),
-			Type: gin.ErrorTypePublic,
-		}
+		return nil, utils.NewNotFoundError("user")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user: %w", err)
@@ -113,10 +110,7 @@ func (s *userService) UpdateUser(id string, req models.UpdateUserRequest) (*mode
 	// Check if user exists
 	_, err = s.repo.GetByID(userID)
 	if err == sql.ErrNoRows {
-		return nil, gin.Error{
-			Err:  fmt.Errorf("user not found"),
-			Type: gin.ErrorTypePublic,
-		}
+		return nil, utils.NewNotFoundError("user")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user existence: %w", err)
@@ -156,10 +150,7 @@ func (s *userService) DeleteUser(id string) error {
 	// Check if user exists
 	_, err = s.repo.GetByID(userID)
 	if err == sql.ErrNoRows {
-		return gin.Error{
-			Err:  fmt.Errorf("user not found"),
-			Type: gin.ErrorTypePublic,
-		}
+		return utils.NewNotFoundError("user")
 	}
 	if err != nil {
 		return fmt.Errorf("failed to check user existence: %w", err)

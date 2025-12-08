@@ -38,7 +38,7 @@ func getEnvOrDefault(key, defaultValue string) string {
 func runReportHandler(c *gin.Context) {
 	var req models.JasperReportRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": "Invalid request format", "details": err.Error()})
+		c.JSON(400, gin.H{"error": "Invalid request format"})
 		return
 	}
 
@@ -46,7 +46,7 @@ func runReportHandler(c *gin.Context) {
 	response, reportData, err := jasperClient.RunReport(&req)
 	if err != nil {
 		log.Printf("Error running JasperServer report: %v", err)
-		c.JSON(500, gin.H{"error": "Failed to run report", "details": err.Error()})
+		c.JSON(500, gin.H{"error": "Failed to run report"})
 		return
 	}
 
@@ -88,7 +88,7 @@ func getServerInfoHandler(c *gin.Context) {
 	info, err := jasperClient.GetServerInfo()
 	if err != nil {
 		log.Printf("Error getting JasperServer info: %v", err)
-		c.JSON(500, gin.H{"error": "Failed to get server info", "details": err.Error()})
+		c.JSON(500, gin.H{"error": "Failed to get server info"})
 		return
 	}
 
@@ -106,7 +106,6 @@ func jasperHealthHandler(c *gin.Context) {
 		c.JSON(500, gin.H{
 			"status":  "error",
 			"message": "JasperServer connection failed",
-			"details": err.Error(),
 		})
 		return
 	}

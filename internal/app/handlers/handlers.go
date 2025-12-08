@@ -5,6 +5,7 @@ import (
 	"adminbe/internal/app/repositories"
 	"adminbe/internal/app/services"
 	"adminbe/internal/pkg/database"
+	"adminbe/internal/pkg/utils"
 	"database/sql"
 	"encoding/json"
 	"log"
@@ -13,12 +14,65 @@ import (
 	"gorm.io/gorm"
 )
 
+// handleServiceError handles common service error patterns
+func handleServiceError(c *gin.Context, err error, operation string) bool {
+	return utils.HandleError(c, err, operation)
+}
+
+// bindJSONRequest binds JSON request and handles validation errors
+func bindJSONRequest(c *gin.Context, req interface{}) bool {
+	if err := c.ShouldBindJSON(req); err != nil {
+		c.JSON(400, gin.H{"error": err.Error()})
+		return false
+	}
+	return true
+}
+
+// logAuditEntry creates an audit log entry (helper for consistency)
+func logAuditEntry(eventType, tableName string, recordID uint64, oldValues, newValues interface{}, db *sql.DB, userID *uint64) {
+	if auditLogChan == nil {
+		return
+	}
+
+	select {
+	case auditLogChan <- auditLogEntry{
+		UserID:    userID,
+		Event:     eventType,
+		Table:     tableName,
+		RecordID:  recordID,
+		OldValues: oldValues,
+		NewValues: newValues,
+		DB:        db,
+	}:
+	default:
+		log.Printf("Warning: audit log queue full, dropping %s audit for %s %d", eventType, tableName, recordID)
+	}
+}
+
 func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	sqlDB, _ := db.DB()
 
 	// Dependency injection setup
 	userRepo := repositories.NewUserRepository(sqlDB)
 	userService := services.NewUserService(userRepo)
+
+	menuRepo := repositories.NewMenuRepository(sqlDB)
+	menuService := services.NewMenuService(menuRepo)
+
+	roleRepo := repositories.NewRoleRepository(sqlDB)
+	roleService := services.NewRoleService(roleRepo)
+
+	roleInheritanceRepo := repositories.NewRoleInheritanceRepository(sqlDB)
+	services.NewRoleInheritanceService(roleInheritanceRepo)
+
+	roleMenuRepo := repositories.NewRoleMenuRepository(sqlDB)
+	services.NewRoleMenuService(roleMenuRepo)
+
+	userMenuRepo := repositories.NewUserMenuRepository(sqlDB)
+	services.NewUserMenuService(userMenuRepo)
+
+	userRoleRepo := repositories.NewUserRoleRepository(sqlDB)
+	services.NewUserRoleService(userRoleRepo)
 
 	// Global middleware
 	r.Use(middleware.CustomRecoveryMiddleware())
@@ -61,19 +115,19 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 		// Menu CRUD
 		menuGroup := apiGroup.Group("/menu")
 		{
-			menuGroup.GET("", listMenuHandler(sqlDB))
-			menuGroup.GET("/:id", getMenuHandler(sqlDB))
-			menuGroup.POST("", createMenuHandler(sqlDB))
-			menuGroup.PUT("/:id", updateMenuHandler(sqlDB))
-			menuGroup.DELETE("/:id", deleteMenuHandler(sqlDB))
+			menuGroup.GET("", listMenuHandler(menuService))
+			menuGroup.GET("/:id", getMenuHandler(menuService))
+			menuGroup.POST("", createMenuHandler(menuService, sqlDB))
+			menuGroup.PUT("/:id", updateMenuHandler(menuService))
+			menuGroup.DELETE("/:id", deleteMenuHandler(menuService))
 		}
 
 		// Roles CRUD
 		rolesGroup := apiGroup.Group("/roles")
 		{
-			rolesGroup.GET("", listRolesHandler(sqlDB))
-			rolesGroup.GET("/:id", getRoleHandler(sqlDB))
-			rolesGroup.POST("", createRoleHandler(sqlDB))
+			rolesGroup.GET("", listRolesHandler(roleService))
+			rolesGroup.GET("/:id", getRoleHandler(roleService))
+			rolesGroup.POST("", createRoleHandler(roleService, sqlDB))
 			rolesGroup.PUT("/:id", updateRoleHandler(sqlDB))
 			rolesGroup.DELETE("/:id", deleteRoleHandler(sqlDB))
 		}

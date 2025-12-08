@@ -4,62 +4,41 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
-	"strconv"
-	"time"
 
 	"adminbe/internal/app/models"
-	"adminbe/internal/pkg/utils"
+	"adminbe/internal/app/services"
 
 	"github.com/gin-gonic/gin"
 )
 
 // listMenuHandler GET /api/menu
-func listMenuHandler(db *sql.DB) gin.HandlerFunc {
+func listMenuHandler(menuService services.MenuService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.Query("SELECT id, label, url, icon, parent_id, sort_order, created_at, updated_at, deleted_at, deleted_by FROM menu WHERE deleted_at IS NULL ORDER BY sort_order")
+		menus, err := menuService.ListMenus()
 		if err != nil {
-			log.Printf("Error querying menu: %v", err)
+			log.Printf("Error listing menus: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve menu"})
 			return
-		}
-		defer rows.Close()
-
-		var menus []models.Menu
-		for rows.Next() {
-			var m models.Menu
-			if err := rows.Scan(&m.ID, &m.Label, &m.Url, &m.Icon, &m.ParentID, &m.SortOrder, &m.CreatedAt, &m.UpdatedAt, &m.DeletedAt, &m.DeletedBy); err != nil {
-				log.Printf("Error scanning menu row: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve menu"})
-				return
-			}
-			menus = append(menus, m)
 		}
 		c.JSON(http.StatusOK, gin.H{"data": menus})
 	}
 }
 
 // getMenuHandler GET /api/menu/:id
-func getMenuHandler(db *sql.DB) gin.HandlerFunc {
+func getMenuHandler(menuService services.MenuService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		menuID, err := strconv.ParseUint(id, 10, 64)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
-			return
-		}
-
-		var m models.Menu
-		row := db.QueryRow("SELECT id, label, url, icon, parent_id, sort_order, created_at, updated_at, deleted_at, deleted_by FROM menu WHERE id = ? AND deleted_at IS NULL", menuID)
-		err = row.Scan(&m.ID, &m.Label, &m.Url, &m.Icon, &m.ParentID, &m.SortOrder, &m.CreatedAt, &m.UpdatedAt, &m.DeletedAt, &m.DeletedBy)
-		if err == sql.ErrNoRows {
+		menu, err := menuService.GetMenu(id)
+		if err != nil && isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Menu not found"})
 			return
-		} else if err != nil {
-			log.Printf("Error querying menu: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database query failed"})
+		}
+		if err != nil {
+			log.Printf("Error getting menu: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve menu"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"data": m})
+		c.JSON(http.StatusOK, gin.H{"data": menu})
 	}
 }
 
@@ -73,7 +52,7 @@ type CreateMenuRequest struct {
 }
 
 // createMenuHandler POST /api/menu
-func createMenuHandler(db *sql.DB) gin.HandlerFunc {
+func createMenuHandler(menuService services.MenuService, db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req CreateMenuRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -81,23 +60,44 @@ func createMenuHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		sortOrder := uint16(0) // default
-		if req.SortOrder != nil {
-			sortOrder = *req.SortOrder
+		menu := models.Menu{
+			Label:    req.Label,
+			Url:      req.Url,
+			Icon:     req.Icon,
+			ParentID: req.ParentID,
+			SortOrder: func() uint16 {
+				if req.SortOrder != nil {
+					return *req.SortOrder
+				}
+				return 0
+			}(),
 		}
 
-		now := time.Now()
-		result, err := db.Exec("INSERT INTO menu (label, url, icon, parent_id, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-			req.Label, req.Url, req.Icon, req.ParentID, sortOrder, now, now)
+		createdMenu, err := menuService.CreateMenu(menu)
 		if err != nil {
-			log.Printf("Error inserting menu: %v", err)
+			log.Printf("Error creating menu: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create menu"})
 			return
 		}
 
-		menuID, _ := result.LastInsertId()
-		c.JSON(http.StatusCreated, gin.H{"message": "Menu created", "id": menuID})
-		createAuditLog(db, nil, "CREATE", "menu", uint64(menuID), nil, req)
+		c.JSON(http.StatusCreated, gin.H{"message": "Menu created", "data": createdMenu})
+
+		// Audit logging
+		if auditLogChan != nil {
+			select {
+			case auditLogChan <- auditLogEntry{
+				UserID:    nil,
+				Event:     "CREATE",
+				Table:     "menu",
+				RecordID:  uint64(createdMenu.ID),
+				OldValues: nil,
+				NewValues: req,
+				DB:        db,
+			}:
+			default:
+				log.Printf("Warning: audit log queue full, dropping CREATE audit for menu %d", createdMenu.ID)
+			}
+		}
 	}
 }
 
@@ -111,14 +111,9 @@ type UpdateMenuRequest struct {
 }
 
 // updateMenuHandler PUT /api/menu/:id
-func updateMenuHandler(db *sql.DB) gin.HandlerFunc {
+func updateMenuHandler(menuService services.MenuService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		menuID, err := strconv.ParseUint(id, 10, 64)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
-			return
-		}
 
 		var req UpdateMenuRequest
 		if err := c.ShouldBindJSON(&req); err != nil {
@@ -126,117 +121,54 @@ func updateMenuHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Check if exists
-		var exists bool
-		err = db.QueryRow("SELECT 1 FROM menu WHERE id = ? AND deleted_at IS NULL", menuID).Scan(&exists)
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Menu not found"})
-			return
-		} else if err != nil {
-			log.Printf("Error checking menu existence: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database query failed"})
-			return
-		}
-
-		// Get old values
-		var oldMenu struct {
-			Label     string  `json:"label"`
-			Url       *string `json:"url"`
-			Icon      *string `json:"icon"`
-			ParentID  *uint   `json:"parent_id"`
-			SortOrder uint16  `json:"sort_order"`
-		}
-		err = db.QueryRow("SELECT label, url, icon, parent_id, sort_order FROM menu WHERE id = ?", menuID).Scan(&oldMenu.Label, &oldMenu.Url, &oldMenu.Icon, &oldMenu.ParentID, &oldMenu.SortOrder)
-		if err != nil {
-			log.Printf("Error getting old menu values: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database query failed"})
-			return
-		}
-
-		// Build update
-		setParts := []string{}
-		args := []interface{}{}
-
+		updateData := make(map[string]interface{})
 		if req.Label != nil {
-			setParts = append(setParts, "label = ?")
-			args = append(args, req.Label)
+			updateData["label"] = *req.Label
 		}
 		if req.Url != nil {
-			setParts = append(setParts, "url = ?")
-			args = append(args, req.Url)
+			updateData["url"] = req.Url
 		}
 		if req.Icon != nil {
-			setParts = append(setParts, "icon = ?")
-			args = append(args, req.Icon)
+			updateData["icon"] = req.Icon
 		}
 		if req.ParentID != nil {
-			setParts = append(setParts, "parent_id = ?")
-			args = append(args, req.ParentID)
+			updateData["parent_id"] = *req.ParentID
 		}
 		if req.SortOrder != nil {
-			setParts = append(setParts, "sort_order = ?")
-			args = append(args, req.SortOrder)
+			updateData["sort_order"] = *req.SortOrder
 		}
 
-		if len(setParts) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "No fields to update"})
+		updatedMenu, err := menuService.UpdateMenu(id, updateData)
+		if err != nil && isNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Menu not found"})
 			return
 		}
-
-		setParts = append(setParts, "updated_at = ?")
-		args = append(args, time.Now())
-
-		query := "UPDATE menu SET " + utils.JoinStrings(setParts, ", ") + " WHERE id = ? AND deleted_at IS NULL"
-		args = append(args, menuID)
-
-		_, err = db.Exec(query, args...)
 		if err != nil {
 			log.Printf("Error updating menu: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Update failed"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update menu"})
 			return
 		}
 
-		c.JSON(http.StatusOK, gin.H{"message": "Menu updated"})
-		createAuditLog(db, nil, "UPDATE", "menu", menuID, oldMenu, req)
+		c.JSON(http.StatusOK, gin.H{"message": "Menu updated", "data": updatedMenu})
 	}
 }
 
 // deleteMenuHandler DELETE /api/menu/:id
-func deleteMenuHandler(db *sql.DB) gin.HandlerFunc {
+func deleteMenuHandler(menuService services.MenuService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		menuID, err := strconv.ParseUint(id, 10, 64)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
-			return
-		}
 
-		// Get old values before delete
-		var oldMenu struct {
-			Label     string  `json:"label"`
-			Url       *string `json:"url"`
-			Icon      *string `json:"icon"`
-			ParentID  *uint   `json:"parent_id"`
-			SortOrder uint16  `json:"sort_order"`
-		}
-		err = db.QueryRow("SELECT label, url, icon, parent_id, sort_order FROM menu WHERE id = ?", menuID).Scan(&oldMenu.Label, &oldMenu.Url, &oldMenu.Icon, &oldMenu.ParentID, &oldMenu.SortOrder)
-		if err == sql.ErrNoRows {
+		err := menuService.DeleteMenu(id)
+		if err != nil && isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Menu not found"})
 			return
-		} else if err != nil {
-			log.Printf("Error getting old menu values: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database query failed"})
-			return
 		}
-
-		_, err = db.Exec("UPDATE menu SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL", time.Now(), time.Now(), menuID)
 		if err != nil {
-			log.Printf("Error soft deleting menu: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Soft delete failed"})
+			log.Printf("Error deleting menu: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete menu"})
 			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "Menu deleted"})
-		createAuditLog(db, nil, "DELETE", "menu", menuID, oldMenu, nil)
 	}
 }

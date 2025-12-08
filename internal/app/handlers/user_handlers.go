@@ -3,7 +3,6 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"log"
 	"strconv"
 	"sync"
@@ -11,6 +10,7 @@ import (
 
 	"adminbe/internal/app/models"
 	"adminbe/internal/app/services"
+	"adminbe/internal/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
@@ -221,11 +221,7 @@ func parseIntMinMax(s string, defaultVal, min, max int) int {
 
 // isNotFoundError checks if error is a public not found error
 func isNotFoundError(err error) bool {
-	var ginErr *gin.Error
-	if errors.As(err, &ginErr) && ginErr.Type == gin.ErrorTypePublic {
-		return true
-	}
-	return false
+	return utils.IsNotFound(err)
 }
 
 // listUsersHandler GET /api/users
@@ -238,9 +234,7 @@ func listUsersHandler(userService services.UserService) gin.HandlerFunc {
 		limit := parseIntMinMax(limitStr, 50, 1, 1000)
 
 		result, err := userService.ListUsers(page, limit)
-		if err != nil {
-			log.Printf("Error listing users: %v", err)
-			c.JSON(500, gin.H{"error": "Failed to retrieve users"})
+		if utils.HandleError(c, err, "list users") {
 			return
 		}
 
@@ -253,13 +247,7 @@ func getUserHandler(userService services.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		user, err := userService.GetUser(id)
-		if err != nil {
-			if isNotFoundError(err) {
-				c.JSON(404, gin.H{"error": "User not found"})
-				return
-			}
-			log.Printf("Error getting user: %v", err)
-			c.JSON(500, gin.H{"error": "Failed to retrieve user"})
+		if utils.HandleError(c, err, "get user") {
 			return
 		}
 		c.JSON(200, gin.H{"data": user})

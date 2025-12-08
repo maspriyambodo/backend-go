@@ -9,86 +9,53 @@ import (
 	"time"
 
 	"adminbe/internal/app/models"
-	utils "adminbe/internal/pkg/utils"
+	"adminbe/internal/app/services"
+	"adminbe/internal/pkg/utils"
 
 	"github.com/gin-gonic/gin"
 )
 
 // listRolesHandler GET /api/roles
-func listRolesHandler(db *sql.DB) gin.HandlerFunc {
+func listRolesHandler(roleService services.RoleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		rows, err := db.Query("SELECT id, name, description, created_at, updated_at, deleted_at, deleted_by FROM roles WHERE deleted_at IS NULL")
+		roles, err := roleService.ListRoles()
 		if err != nil {
-			log.Printf("Error querying roles: %v", err)
+			log.Printf("Error listing roles: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve roles"})
 			return
-		}
-		defer rows.Close()
-
-		var roles []models.Role
-		for rows.Next() {
-			var r models.Role
-			if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.CreatedAt, &r.UpdatedAt, &r.DeletedAt, &r.DeletedBy); err != nil {
-				log.Printf("Error scanning role row: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve roles"})
-				return
-			}
-			roles = append(roles, r)
 		}
 		c.JSON(http.StatusOK, gin.H{"data": roles})
 	}
 }
 
 // getRoleHandler GET /api/roles/:id
-func getRoleHandler(db *sql.DB) gin.HandlerFunc {
+func getRoleHandler(roleService services.RoleService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		roleID, err := strconv.ParseUint(id, 10, 32)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
+		role, err := roleService.GetRole(id)
+		if handleServiceError(c, err, "role") {
 			return
 		}
-
-		var r models.Role
-		row := db.QueryRow("SELECT id, name, description, created_at, updated_at, deleted_at, deleted_by FROM roles WHERE id = ? AND deleted_at IS NULL", uint(roleID))
-		err = row.Scan(&r.ID, &r.Name, &r.Description, &r.CreatedAt, &r.UpdatedAt, &r.DeletedAt, &r.DeletedBy)
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "Role not found"})
-			return
-		} else if err != nil {
-			log.Printf("Error querying role: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Database query failed"})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"data": r})
+		c.JSON(http.StatusOK, gin.H{"data": role})
 	}
 }
 
 // createRoleHandler POST /api/roles
-func createRoleHandler(db *sql.DB) gin.HandlerFunc {
+func createRoleHandler(roleService services.RoleService, db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req models.CreateRoleRequest
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		if !bindJSONRequest(c, &req) {
 			return
 		}
 
-		now := time.Now()
-		result, err := db.Exec("INSERT INTO roles (name, description, created_at, updated_at) VALUES (?, ?, ?, ?)",
-			req.Name, req.Description, now, now)
+		role, err := roleService.CreateRole(req)
 		if err != nil {
-			log.Printf("Error inserting role: %v", err)
-			if strings.Contains(err.Error(), "1062") {
-				c.JSON(http.StatusConflict, gin.H{"error": "Role name already exists"})
-			} else {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create role"})
-			}
+			handleServiceError(c, err, "create role")
 			return
 		}
 
-		roleID, _ := result.LastInsertId()
-		c.JSON(http.StatusCreated, gin.H{"message": "Role created", "id": roleID})
-		createAuditLog(db, nil, "CREATE", "roles", uint64(roleID), nil, req)
+		c.JSON(http.StatusCreated, gin.H{"message": "Role created", "data": role})
+		logAuditEntry("CREATE", "roles", uint64(role.ID), nil, req, db, nil)
 	}
 }
 
