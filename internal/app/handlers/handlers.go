@@ -28,15 +28,35 @@ func bindJSONRequest(c *gin.Context, req interface{}) bool {
 	return true
 }
 
+// getUserIDFromContext extracts user ID from Gin context
+func getUserIDFromContext(c *gin.Context) *uint64 {
+	userIDVal, exists := c.Get("user_id")
+	if !exists {
+		return nil
+	}
+
+	if userID, ok := userIDVal.(uint64); ok {
+		return &userID
+	}
+
+	return nil
+}
+
 // logAuditEntry creates an audit log entry (helper for consistency)
-func logAuditEntry(eventType, tableName string, recordID uint64, oldValues, newValues interface{}, db *sql.DB, userID *uint64) {
+func logAuditEntry(c *gin.Context, eventType, tableName string, recordID uint64, oldValues, newValues interface{}, db *sql.DB) {
 	if auditLogChan == nil {
+		return
+	}
+
+	userIDPtr := getUserIDFromContext(c)
+	if userIDPtr == nil {
+		log.Printf("Warning: cannot create audit log without user ID for %s %s %d", eventType, tableName, recordID)
 		return
 	}
 
 	select {
 	case auditLogChan <- auditLogEntry{
-		UserID:    userID,
+		UserID:    *userIDPtr,
 		Event:     eventType,
 		Table:     tableName,
 		RecordID:  recordID,
@@ -47,6 +67,11 @@ func logAuditEntry(eventType, tableName string, recordID uint64, oldValues, newV
 	default:
 		log.Printf("Warning: audit log queue full, dropping %s audit for %s %d", eventType, tableName, recordID)
 	}
+}
+
+// isNotFoundError checks if error is a public not found error
+func isNotFoundError(err error) bool {
+	return utils.IsNotFound(err)
 }
 
 func SetupRoutes(r *gin.Engine, db *gorm.DB) {
@@ -225,8 +250,13 @@ func healthHandler(c *gin.Context, db *gorm.DB) {
 	c.JSON(200, gin.H{"status": "ok", "message": "Service is healthy", "redis": redisHealthy})
 }
 
-// createAuditLog creates an audit log entry
-func createAuditLog(db *sql.DB, userID *uint64, eventType string, tableName string, recordID uint64, oldValues interface{}, newValues interface{}) {
+// createAuditLog creates an audit log entry (deprecated - use logAuditEntry with Gin context instead)
+func createAuditLog(db *sql.DB, userIDPtr *uint64, eventType string, tableName string, recordID uint64, oldValues interface{}, newValues interface{}) {
+	userID := uint64(0) // Default fallback ID
+	if userIDPtr != nil {
+		userID = *userIDPtr
+	}
+
 	var oldJSON, newJSON []byte
 	if oldValues != nil {
 		oldJSON, _ = json.Marshal(oldValues)

@@ -7,20 +7,41 @@ import (
 
 	"adminbe/internal/app/models"
 	"adminbe/internal/app/services"
+	"adminbe/internal/pkg/cache"
+	"adminbe/internal/pkg/database"
 
 	"github.com/gin-gonic/gin"
 )
 
+// isNotFoundError function is defined in user_handlers.go
+
 // listMenuHandler GET /api/menu
 func listMenuHandler(menuService services.MenuService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		menus, err := menuService.ListMenus()
+		// Try to get from Redis cache first
+		var menus []models.Menu
+		err := database.Cache.Get(cache.CacheKeyMenuList, &menus)
+		if err == nil {
+			// Cache hit
+			c.JSON(http.StatusOK, gin.H{"data": menus, "cached": true})
+			return
+		}
+
+		// Cache miss - fetch from database
+		menus, err = menuService.ListMenus()
 		if err != nil {
 			log.Printf("Error listing menus: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve menu"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"data": menus})
+
+		// Cache the result
+		cacheErr := database.Cache.Set(cache.CacheKeyMenuList, menus, cache.DefaultListExpiration)
+		if cacheErr != nil {
+			log.Printf("Warning: Failed to cache menus: %v", cacheErr)
+		}
+
+		c.JSON(http.StatusOK, gin.H{"data": menus, "cached": false})
 	}
 }
 
@@ -80,24 +101,19 @@ func createMenuHandler(menuService services.MenuService, db *sql.DB) gin.Handler
 			return
 		}
 
-		c.JSON(http.StatusCreated, gin.H{"message": "Menu created", "data": createdMenu})
+		// Invalidate menu cache
+		invalidateErr := database.Cache.Delete(cache.CacheKeyMenuList)
+		if invalidateErr != nil {
+			log.Printf("Warning: Failed to invalidate menu cache: %v", invalidateErr)
+		}
+
+		// Also invalidate menu navigation cache
+		database.Cache.Delete(cache.CacheKeyMenuNavigation)
 
 		// Audit logging
-		if auditLogChan != nil {
-			select {
-			case auditLogChan <- auditLogEntry{
-				UserID:    nil,
-				Event:     "CREATE",
-				Table:     "menu",
-				RecordID:  uint64(createdMenu.ID),
-				OldValues: nil,
-				NewValues: req,
-				DB:        db,
-			}:
-			default:
-				log.Printf("Warning: audit log queue full, dropping CREATE audit for menu %d", createdMenu.ID)
-			}
-		}
+		logAuditEntry(c, "CREATE", "menu", uint64(createdMenu.ID), nil, req, db)
+
+		c.JSON(http.StatusCreated, gin.H{"message": "Menu created", "data": createdMenu})
 	}
 }
 
@@ -149,6 +165,15 @@ func updateMenuHandler(menuService services.MenuService) gin.HandlerFunc {
 			return
 		}
 
+		// Invalidate menu cache
+		invalidateErr := database.Cache.Delete(cache.CacheKeyMenuList)
+		if invalidateErr != nil {
+			log.Printf("Warning: Failed to invalidate menu cache: %v", invalidateErr)
+		}
+
+		// Also invalidate menu navigation cache
+		database.Cache.Delete(cache.CacheKeyMenuNavigation)
+
 		c.JSON(http.StatusOK, gin.H{"message": "Menu updated", "data": updatedMenu})
 	}
 }
@@ -168,6 +193,15 @@ func deleteMenuHandler(menuService services.MenuService) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete menu"})
 			return
 		}
+
+		// Invalidate menu cache
+		invalidateErr := database.Cache.Delete(cache.CacheKeyMenuList)
+		if invalidateErr != nil {
+			log.Printf("Warning: Failed to invalidate menu cache: %v", invalidateErr)
+		}
+
+		// Also invalidate menu navigation cache
+		database.Cache.Delete(cache.CacheKeyMenuNavigation)
 
 		c.JSON(http.StatusOK, gin.H{"message": "Menu deleted"})
 	}

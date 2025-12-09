@@ -46,7 +46,7 @@ const (
 
 // auditLogEntry represents an audit log entry for async processing
 type auditLogEntry struct {
-	UserID    *uint64       `json:"user_id,omitempty"`
+	UserID    uint64        `json:"user_id"`
 	Event     string        `json:"event"`
 	Table     string        `json:"table"`
 	RecordID  uint64        `json:"record_id"`
@@ -219,11 +219,6 @@ func parseIntMinMax(s string, defaultVal, min, max int) int {
 	return val
 }
 
-// isNotFoundError checks if error is a public not found error
-func isNotFoundError(err error) bool {
-	return utils.IsNotFound(err)
-}
-
 // listUsersHandler GET /api/users
 func listUsersHandler(userService services.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -270,24 +265,10 @@ func createUserHandler(userService services.UserService, db *sql.DB) gin.Handler
 			return
 		}
 
-		c.JSON(201, gin.H{"message": "User created", "data": user})
-
 		// Audit logging
-		if auditLogChan != nil {
-			select {
-			case auditLogChan <- auditLogEntry{
-				UserID:    nil,
-				Event:     "CREATE",
-				Table:     "users",
-				RecordID:  user.ID,
-				OldValues: nil,
-				NewValues: req,
-				DB:        db,
-			}:
-			default:
-				log.Printf("Warning: audit log queue full, dropping CREATE audit for user %d", user.ID)
-			}
-		}
+		logAuditEntry(c, "CREATE", "users", user.ID, nil, req, db)
+
+		c.JSON(201, gin.H{"message": "User created", "data": user})
 	}
 }
 

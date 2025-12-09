@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 
+	"adminbe/internal/pkg/cache"
+
 	"github.com/go-redis/redis/v8"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -13,6 +15,7 @@ import (
 
 var (
 	RedisClient *redis.Client
+	Cache       *cache.Cache
 	StmtCache   *PreparedStmts
 )
 
@@ -72,6 +75,10 @@ func ConnectDB() *gorm.DB {
 	} else {
 		log.Println("Connected to Redis")
 	}
+
+	// Initialize cache wrapper
+	Cache = cache.NewCache(RedisClient)
+	log.Println("Initialized Redis cache wrapper")
 
 	// Initialize prepared statements cache
 	StmtCache = NewPreparedStmts(sqlDB)

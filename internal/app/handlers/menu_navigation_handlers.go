@@ -2,37 +2,29 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
 	"adminbe/internal/app/models"
+	"adminbe/internal/pkg/cache"
 	"adminbe/internal/pkg/database"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-redis/redis/v8"
 )
 
 // listMenuNavigationHandler GET /api/menu_navigation
 func listMenuNavigationHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cacheKey := "menu_navigation_cache"
-		rdb := database.RedisClient
-
-		// Try to get from Redis
-		cachedData, err := rdb.Get(rdb.Context(), cacheKey).Result()
+		// Try to get from Redis cache first
+		var navigations []models.MenuNavigation
+		err := database.Cache.Get(cache.CacheKeyMenuNavigation, &navigations)
 		if err == nil {
-			var navigations []models.MenuNavigation
-			if err := json.Unmarshal([]byte(cachedData), &navigations); err == nil {
-				c.JSON(http.StatusOK, gin.H{"data": navigations, "cached": true})
-				return
-			}
-		} else if err != redis.Nil {
-			log.Printf("Error getting from Redis: %v", err)
+			// Cache hit
+			c.JSON(http.StatusOK, gin.H{"data": navigations, "cached": true})
+			return
 		}
 
-		// Query from DB
+		// Cache miss - query from DB
 		rows, err := db.Query("SELECT id, label, url, icon, children FROM menu_navigation")
 		if err != nil {
 			log.Printf("Error querying menu_navigation: %v", err)
@@ -41,7 +33,7 @@ func listMenuNavigationHandler(db *sql.DB) gin.HandlerFunc {
 		}
 		defer rows.Close()
 
-		var navigations []models.MenuNavigation
+		navigations = []models.MenuNavigation{}
 		for rows.Next() {
 			var mn models.MenuNavigation
 			if err := rows.Scan(&mn.ID, &mn.Label, &mn.URL, &mn.Icon, &mn.Children); err != nil {
@@ -52,11 +44,10 @@ func listMenuNavigationHandler(db *sql.DB) gin.HandlerFunc {
 			navigations = append(navigations, mn)
 		}
 
-		// Cache in Redis for 10 minutes
-		if rdb != nil {
-			if data, err := json.Marshal(navigations); err == nil {
-				rdb.Set(rdb.Context(), cacheKey, data, 10*time.Minute)
-			}
+		// Cache the result
+		cacheErr := database.Cache.Set(cache.CacheKeyMenuNavigation, navigations, cache.DefaultNavigationExpiration)
+		if cacheErr != nil {
+			log.Printf("Warning: Failed to cache menu navigation: %v", cacheErr)
 		}
 
 		c.JSON(http.StatusOK, gin.H{"data": navigations, "cached": false})

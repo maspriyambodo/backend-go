@@ -20,7 +20,7 @@ type User struct {
 // AuditLog represents the audit_logs table
 type AuditLog struct {
 	ID        uint64      `json:"id" db:"id"`
-	UserID    *uint64     `json:"user_id" db:"user_id"`
+	UserID    uint64      `json:"user_id" db:"user_id"`
 	EventType string      `json:"event_type" db:"event_type"`
 	TableName string      `json:"table_name" db:"table_name"`
 	RecordID  uint64      `json:"record_id" db:"record_id"`

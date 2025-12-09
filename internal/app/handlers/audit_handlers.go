@@ -110,7 +110,7 @@ func getAuditLogHandler(db *sql.DB) gin.HandlerFunc {
 func createAuditLogHandler(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var req struct {
-			UserID    *uint64     `json:"user_id"`
+			UserID    uint64      `json:"user_id" binding:"required"`
 			EventType string      `json:"event_type" binding:"required"`
 			TableName string      `json:"table_name" binding:"required"`
 			RecordID  uint64      `json:"record_id" binding:"required"`

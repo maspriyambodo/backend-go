@@ -54,8 +54,10 @@ func createRoleHandler(roleService services.RoleService, db *sql.DB) gin.Handler
 			return
 		}
 
+		// Audit logging
+		logAuditEntry(c, "CREATE", "roles", uint64(role.ID), nil, req, db)
+
 		c.JSON(http.StatusCreated, gin.H{"message": "Role created", "data": role})
-		logAuditEntry("CREATE", "roles", uint64(role.ID), nil, req, db, nil)
 	}
 }
 
@@ -134,8 +136,10 @@ func updateRoleHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// Audit logging
+		logAuditEntry(c, "UPDATE", "roles", uint64(roleID), oldRole, req, db)
+
 		c.JSON(http.StatusOK, gin.H{"message": "Role updated"})
-		createAuditLog(db, nil, "UPDATE", "roles", uint64(roleID), oldRole, req)
 	}
 }
 
@@ -147,14 +151,6 @@ func deleteRoleHandler(db *sql.DB) gin.HandlerFunc {
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid ID"})
 			return
-		}
-
-		// Get current user ID
-		userIDVal, exists := c.Get("user_id")
-		var userID *uint64
-		if exists {
-			uid := userIDVal.(uint64)
-			userID = &uid
 		}
 
 		// Get old values before delete
@@ -172,14 +168,18 @@ func deleteRoleHandler(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		_, err = db.Exec("UPDATE roles SET deleted_at = ?, updated_at = ?, deleted_by = ? WHERE id = ? AND deleted_at IS NULL", time.Now(), time.Now(), userID, uint(roleID))
+		// Perform soft delete
+		_, err = db.Exec("UPDATE roles SET deleted_at = ?, updated_at = ?, deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
+			time.Now(), time.Now(), getUserIDFromContext(c), uint(roleID))
 		if err != nil {
 			log.Printf("Error soft deleting role: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Soft delete failed"})
 			return
 		}
 
+		// Audit logging
+		logAuditEntry(c, "DELETE", "roles", uint64(roleID), oldRole, nil, db)
+
 		c.JSON(http.StatusOK, gin.H{"message": "Role deleted"})
-		createAuditLog(db, userID, "DELETE", "roles", uint64(roleID), oldRole, nil)
 	}
 }
