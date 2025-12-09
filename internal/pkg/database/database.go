@@ -24,7 +24,7 @@ func ConnectDB() *gorm.DB {
 	if user == "" {
 		user = "root"
 	}
-	pass := os.Getenv("DB_PASS")
+	pass := os.Getenv("DB_PASSWORD")
 	host := os.Getenv("DB_HOST")
 	if host == "" {
 		host = "127.0.0.1"
@@ -58,11 +58,16 @@ func ConnectDB() *gorm.DB {
 	log.Println("Connected to MySQL database with GORM")
 
 	// Connect Redis
-	redisAddr := os.Getenv("REDIS_ADDR")
-	if redisAddr == "" {
-		redisAddr = "127.0.0.1:6379"
+	redisHost := os.Getenv("REDIS_HOST")
+	if redisHost == "" {
+		redisHost = "127.0.0.1"
 	}
-	redisPass := os.Getenv("REDIS_PASS")
+	redisPort := os.Getenv("REDIS_PORT")
+	if redisPort == "" {
+		redisPort = "6379"
+	}
+	redisAddr := fmt.Sprintf("%s:%s", redisHost, redisPort)
+	redisPass := os.Getenv("REDIS_PASSWORD")
 
 	RedisClient = redis.NewClient(&redis.Options{
 		Addr:     redisAddr,
