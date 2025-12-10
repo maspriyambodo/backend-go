@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -79,7 +80,7 @@ func getShalatBlnHandler(shalatService services.ShalatService) gin.HandlerFunc {
 			}
 		}
 
-		result, err := shalatService.GetShalatMonth(provID, cityID, year, month-1) // months are 0-based in Go
+		result, err := shalatService.GetShalatMonth(provID, cityID, year, month) // months are 0-based in Go
 		if err != nil {
 			handleServiceError(c, err, "get shalat month")
 			return
@@ -296,7 +297,7 @@ func getApiSholatblnHandler(shalatService services.ShalatService) gin.HandlerFun
 			}
 		}
 
-		result, err := shalatService.GetShalatMonth(provID, cityID, year, month-1)
+		result, err := shalatService.GetShalatMonth(provID, cityID, year, month)
 		if err != nil {
 			handleServiceError(c, err, "get shalat month")
 			return
@@ -359,7 +360,15 @@ func buildOptionString(options []map[string]interface{}) string {
 	result.Grow(len(options) * 50) // Pre-allocate approximate size
 	for _, opt := range options {
 		result.WriteString("<option value='")
-		result.WriteString(opt["value"].(string))
+		// Handle both int and string values
+		switch value := opt["value"].(type) {
+		case int:
+			result.WriteString(strconv.Itoa(value))
+		case string:
+			result.WriteString(value)
+		default:
+			result.WriteString(fmt.Sprintf("%v", value))
+		}
 		result.WriteString("'>")
 		result.WriteString(opt["text"].(string))
 		result.WriteString("</option>")
