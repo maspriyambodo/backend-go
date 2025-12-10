@@ -99,6 +99,10 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	userRoleRepo := repositories.NewUserRoleRepository(sqlDB)
 	services.NewUserRoleService(userRoleRepo)
 
+	// Shalat services
+	shalatRepo := repositories.NewShalatRepository(sqlDB)
+	shalatService := services.NewShalatService(shalatRepo)
+
 	// Global middleware
 	r.Use(middleware.CustomRecoveryMiddleware())
 	r.Use(middleware.RequestLoggerMiddleware(sqlDB))
@@ -215,6 +219,22 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 			reportsGroup.POST("/run", runReportHandler)
 			reportsGroup.GET("/server-info", getServerInfoHandler)
 			reportsGroup.GET("/health", jasperHealthHandler)
+		}
+
+		// Shalat group (public for prayer times)
+		shalatGroup := r.Group("/api/v1")
+		{
+			shalatGroup.POST("/getShalat", getShalatHandler(shalatService))
+			shalatGroup.POST("/getsholatbln", getShalatBlnHandler(shalatService))
+			shalatGroup.POST("/getShalat30", getShalat30Handler(shalatService))
+			shalatGroup.POST("/getimsakiyah", getImsakiyahHandler(shalatService))
+			shalatGroup.POST("/getTahunimsak", getTahunImsakHandler(shalatService))
+			shalatGroup.POST("/getProv", getProvHandler(shalatService))
+			shalatGroup.POST("/getKabko", getKabkoHandler(shalatService))
+			shalatGroup.POST("/getApiProv", getApiProvHandler(shalatService))
+			shalatGroup.POST("/getApiKabko", getApiKabkoHandler(shalatService))
+			shalatGroup.POST("/getApiSholatbln", getApiSholatblnHandler(shalatService))
+			shalatGroup.POST("/getApiimsakiyah", getApiImsakiyahHandler(shalatService))
 		}
 	}
 }

@@ -24,23 +24,22 @@ services:
       GIN_MODE: debug
       
       # MySQL existing container
-      DB_HOST: db_mysql
+      DB_HOST: mysqldb
       DB_PORT: 3306
       DB_USER: root
       DB_PASS: Masdatinlantai7
-      DB_NAME: adminbe
-
+      DB_NAME: db_cms
       # Redis existing container
-      REDIS_HOST: redis_db
+      REDIS_HOST: redis-local
       REDIS_PORT: 6379
 
     networks:
-      - custom_network
+      - nginx-proxy_web
 
 volumes:
   gomodcache:
   gobuildcache:
 
 networks:
-  custom_network:
+  nginx-proxy_web:
     external: true

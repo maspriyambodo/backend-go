@@ -209,3 +209,47 @@ type JasperReportResponse struct {
 	ErrorMessage string `json:"errorMessage,omitempty"`
 	Permissions  string `json:"permissions,omitempty"`
 }
+
+// AppProvince represents the app_province table
+type AppProvince struct {
+	ProvinceID    uint64 `json:"province_id" db:"province_id"`
+	ProvinceTitle string `json:"province_title" db:"province_title"`
+	ProvinceIDNew uint64 `json:"province_id_new" db:"province_id_new"`
+}
+
+// AppCity represents the app_city table
+type AppCity struct {
+	CityID       uint64 `json:"city_id" db:"city_id"`
+	CityTitle    string `json:"city_title" db:"city_title"`
+	CityProvince uint64 `json:"city_province" db:"city_province"`
+	CityIDNew    uint64 `json:"city_id_new" db:"city_id_new"`
+}
+
+// DataLintangKotaCmsNew represents the data_lintang_kota_cms_new table
+type DataLintangKotaCmsNew struct {
+	IDKota        uint64     `json:"id_kota" db:"id_kota"`
+	NamaPropinsi  uint64     `json:"nama_propinsi" db:"nama_propinsi"`
+	NamaKota      uint64     `json:"nama_kota" db:"nama_kota"`
+	BujurTempat   string     `json:"bujur_tempat" db:"bujur_tempat"`
+	LintangTempat string     `json:"lintang_tempat" db:"lintang_tempat"`
+	TimeZone      string     `json:"time_zone" db:"time_zone"`
+	H             *int       `json:"h" db:"h"`
+	TimeCreate    *time.Time `json:"time_create" db:"time_create"`
+	// Joined fields for query results
+	ProvinceTitle string `json:"province_title"`
+	CityTitle     string `json:"city_title"`
+}
+
+// HisabTglPuasa represents the hisab_tgl_puasa table
+type HisabTglPuasa struct {
+	TglID      uint64     `json:"tgl_id" db:"tgl_id"`
+	TglTahun   *int       `json:"tgl_tahun" db:"tgl_tahun"`
+	TglStart   *string    `json:"tgl_start" db:"tgl_start"`
+	TglEnd     *string    `json:"tgl_end" db:"tgl_end"`
+	TglStatus  *int       `json:"tgl_status" db:"tgl_status"`
+	TglHijriah *int       `json:"tgl_hijriah" db:"tgl_hijriah"`
+	TimeAdd    *time.Time `json:"time_add" db:"time_add"`
+	TimeUpdate *time.Time `json:"time_update" db:"time_update"`
+	UserAdd    *uint64    `json:"user_add" db:"user_add"`
+	UserUpdate *uint64    `json:"user_update" db:"user_update"`
+}
