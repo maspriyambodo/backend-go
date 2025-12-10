@@ -127,7 +127,7 @@ type UpdateMenuRequest struct {
 }
 
 // updateMenuHandler PUT /api/menu/:id
-func updateMenuHandler(menuService services.MenuService) gin.HandlerFunc {
+func updateMenuHandler(menuService services.MenuService, db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 
@@ -174,16 +174,34 @@ func updateMenuHandler(menuService services.MenuService) gin.HandlerFunc {
 		// Also invalidate menu navigation cache
 		database.Cache.Delete(cache.CacheKeyMenuNavigation)
 
+		// Audit logging
+		logAuditEntry(c, "UPDATE", "menu", uint64(updatedMenu.ID), nil, req, db)
+
 		c.JSON(http.StatusOK, gin.H{"message": "Menu updated", "data": updatedMenu})
 	}
 }
 
 // deleteMenuHandler DELETE /api/menu/:id
-func deleteMenuHandler(menuService services.MenuService) gin.HandlerFunc {
+func deleteMenuHandler(menuService services.MenuService, db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 
-		err := menuService.DeleteMenu(id)
+		// Get the menu for audit logging
+		menu, err := menuService.GetMenu(id)
+		if err != nil && isNotFoundError(err) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "Menu not found"})
+			return
+		}
+		if err != nil {
+			log.Printf("Error getting menu for deletion: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete menu"})
+			return
+		}
+
+		// Audit logging for DELETE event
+		logAuditEntry(c, "DELETE", "menu", uint64(menu.ID), menu, nil, db)
+
+		err = menuService.DeleteMenu(id)
 		if err != nil && isNotFoundError(err) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "Menu not found"})
 			return

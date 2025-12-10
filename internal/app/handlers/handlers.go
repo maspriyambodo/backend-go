@@ -123,8 +123,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 			userGroup.GET("", listUsersHandler(userService))
 			userGroup.GET("/:id", getUserHandler(userService))
 			userGroup.POST("", createUserHandler(userService, sqlDB))
-			userGroup.PUT("/:id", updateUserHandler(userService))
-			userGroup.DELETE("/:id", deleteUserHandler(userService))
+			userGroup.PUT("/:id", updateUserHandler(userService, sqlDB))
+			userGroup.DELETE("/:id", deleteUserHandler(userService, sqlDB))
 		}
 
 		// Audit Logs CRUD
@@ -143,8 +143,8 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 			menuGroup.GET("", listMenuHandler(menuService))
 			menuGroup.GET("/:id", getMenuHandler(menuService))
 			menuGroup.POST("", createMenuHandler(menuService, sqlDB))
-			menuGroup.PUT("/:id", updateMenuHandler(menuService))
-			menuGroup.DELETE("/:id", deleteMenuHandler(menuService))
+			menuGroup.PUT("/:id", updateMenuHandler(menuService, sqlDB))
+			menuGroup.DELETE("/:id", deleteMenuHandler(menuService, sqlDB))
 		}
 
 		// Roles CRUD

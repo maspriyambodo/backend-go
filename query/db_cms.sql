@@ -24,7 +24,7 @@ DROP TABLE IF EXISTS `audit_logs`;
 CREATE TABLE `audit_logs`  (
   `id` bigint UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id` bigint UNSIGNED NULL DEFAULT NULL,
-  `event_type` enum('CREATE','UPDATE','DELETE','RESTORE','LOGIN','LOGOUT') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
+  `event_type` enum('CREATE','UPDATE','DELETE','RESTORE','LOGIN','LOGOUT','API_ACCESS','API_ERROR') CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `table_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci NOT NULL,
   `record_id` bigint UNSIGNED NOT NULL,
   `old_values` json NULL,

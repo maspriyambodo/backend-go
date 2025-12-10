@@ -273,7 +273,7 @@ func createUserHandler(userService services.UserService, db *sql.DB) gin.Handler
 }
 
 // updateUserHandler PUT /api/users/:id
-func updateUserHandler(userService services.UserService) gin.HandlerFunc {
+func updateUserHandler(userService services.UserService, db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 
@@ -294,6 +294,9 @@ func updateUserHandler(userService services.UserService) gin.HandlerFunc {
 			return
 		}
 
+		// Audit logging
+		logAuditEntry(c, "UPDATE", "users", user.ID, nil, req, db)
+
 		c.JSON(200, gin.H{"message": "User updated", "data": user})
 
 		// Audit logging would go here, but we need DB
@@ -301,11 +304,27 @@ func updateUserHandler(userService services.UserService) gin.HandlerFunc {
 }
 
 // deleteUserHandler DELETE /api/users/:id
-func deleteUserHandler(userService services.UserService) gin.HandlerFunc {
+func deleteUserHandler(userService services.UserService, db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 
-		err := userService.DeleteUser(id)
+		// Get the user before deletion for audit logging
+		user, err := userService.GetUser(id)
+		if err != nil {
+			if isNotFoundError(err) {
+				c.JSON(404, gin.H{"error": "User not found"})
+				return
+			}
+			log.Printf("Error getting user for deletion: %v", err)
+			c.JSON(500, gin.H{"error": "Failed to delete user"})
+			return
+		}
+
+		// Audit logging for DELETE event
+		logAuditEntry(c, "DELETE", "users", user.ID, user, nil, db)
+
+		// Proceed with deletion
+		err = userService.DeleteUser(id)
 		if err != nil {
 			if isNotFoundError(err) {
 				c.JSON(404, gin.H{"error": "User not found"})
