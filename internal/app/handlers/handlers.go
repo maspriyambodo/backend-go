@@ -99,6 +99,9 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 	userRoleRepo := repositories.NewUserRoleRepository(sqlDB)
 	services.NewUserRoleService(userRoleRepo)
 
+	prayerRepo := repositories.NewPrayerRepository(sqlDB)
+	prayerService := services.NewPrayerService(prayerRepo)
+
 	// Global middleware
 	r.Use(middleware.CustomRecoveryMiddleware())
 	r.Use(middleware.RequestLoggerMiddleware(sqlDB))
@@ -215,6 +218,16 @@ func SetupRoutes(r *gin.Engine, db *gorm.DB) {
 			reportsGroup.POST("/run", runReportHandler)
 			reportsGroup.GET("/server-info", getServerInfoHandler)
 			reportsGroup.GET("/health", jasperHealthHandler)
+		}
+
+		// Prayer schedule (Shalat) API - typically public but keeping under auth for consistency
+		apiv1Group := apiGroup.Group("/apiv1")
+		{
+			apiv1Group.POST("/getShalat", getShalatHandler(prayerService))
+			apiv1Group.POST("/getApiProv", getApiProvHandler(prayerService))
+			apiv1Group.POST("/getApiKabko", getApiKabkoHandler(prayerService))
+			apiv1Group.POST("/getApiSholatbln", getApiSholatblnHandler(prayerService))
+			apiv1Group.POST("/getApiimsakiyah", getApiimsakiyahHandler(prayerService))
 		}
 
 	}
